@@ -5,7 +5,7 @@ import hmac
 import hashlib
 import time
 from datetime import datetime, timedelta, timezone
-from streamlit_autorefresh import st_autorefresh
+
 
 # ---- Configuration (Edit these) -----
 DELTA_API_URL = 'https://api.india.delta.exchange'
@@ -151,3 +151,4 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Next refresh in {refresh_rate} seconds")
+
