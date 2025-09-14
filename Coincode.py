@@ -6,7 +6,6 @@ import hashlib
 import time
 from datetime import datetime, timedelta, timezone
 
-
 # ---- Configuration (Edit these) -----
 DELTA_API_URL = 'https://api.india.delta.exchange'
 API_KEY = ''  # Leave empty for public data
@@ -100,11 +99,16 @@ st.sidebar.header("Settings")
 
 refresh_rate = st.sidebar.slider("Auto-refresh (seconds)", 10, 600, 300)
 
-# Autorefresh call **only once**
-count = st_autorefresh(interval=refresh_rate * 1000, key="datarefresh")
+if 'last_refresh_time' not in st.session_state:
+    st.session_state.last_refresh_time = 0
 
 if 'last_status' not in st.session_state:
     st.session_state.last_status = {}
+
+current_time = time.time()
+if current_time - st.session_state.last_refresh_time > refresh_rate:
+    st.session_state.last_refresh_time = current_time
+    st.experimental_rerun()
 
 table_data = []
 for symbol in SYMBOLS:
@@ -151,4 +155,3 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Next refresh in {refresh_rate} seconds")
-
