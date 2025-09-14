@@ -19,7 +19,7 @@ SYMBOLS = ['WLFIUSD','AIOUSD','ZORAUSD','TOWNSUSD','PROVEUSD','ENSUSD','SKLUSD',
            'PNUTUSD','SAGAUSD','NEIROUSD','POLUSD','EIGENUSD','MANTAUSD','GALAUSD','BLURUSD','OMNIUSD','TAOUSD','LISTAUSD','ZKUSD','IOUSD','ZROUSD','BBUSD','NOTUSD','ETHFIUSD','PEOPLEUSD',
            'DYDXUSD','SUSHIUSD','MKRUSD','ARUSD','RUNEUSD','XAIUSD','APTUSD','STXUSD','ALTUSD','TRXUSD','OPUSD','FILUSD','LDOUSD','ETCUSD','TRBUSD','ENAUSD','PENDLEUSD','ONDOUSD','AAVEUSD',
            'JTOUSD','HBARUSD','ORDIUSD','MEMEUSD','FLOKIUSD','PEPEUSD','ARBUSD','TIAUSD','SEIUSD','SUIUSD','WLDUSD','INJUSD','ALGOUSD','NEARUSD','ADAUSD','ATOMUSD','BONKUSD','SHIBUSD','WIFUSD',
-           'DOTUSD','UNIUSD','BNBUSD','LINKUSD','LTCUSD','BCHUSD','XRPUSD','AVAXUSD','SOLUSD','DOGEUSD','ETHUSD','BTCUSD' ]  # Valid Delta Exchange symbols
+           'DOTUSD','UNIUSD','BNBUSD','LINKUSD','LTCUSD','BCHUSD','XRPUSD','AVAXUSD','SOLUSD','DOGEUSD','ETHUSD','BTCUSD']
 
 TELEGRAM_TOKEN = '7994211539:AAGTxk3VBb4rcg4CqMrK3B47geKCSjebg5w'
 TELEGRAM_CHAT_ID = '-1002806176997'
@@ -100,15 +100,20 @@ st.sidebar.header("Settings")
 refresh_rate = st.sidebar.slider("Auto-refresh (seconds)", 10, 600, 300)
 
 if 'last_refresh_time' not in st.session_state:
-    st.session_state.last_refresh_time = 0
+    st.session_state.last_refresh_time = time.time()
+    st.session_state.has_run_once = False
 
 if 'last_status' not in st.session_state:
     st.session_state.last_status = {}
 
 current_time = time.time()
-if current_time - st.session_state.last_refresh_time > refresh_rate:
-    st.session_state.last_refresh_time = current_time
-    st.experimental_rerun()
+
+if st.session_state.has_run_once:
+    if current_time - st.session_state.last_refresh_time > refresh_rate:
+        st.session_state.last_refresh_time = current_time
+        st.experimental_rerun()
+else:
+    st.session_state.has_run_once = True
 
 table_data = []
 for symbol in SYMBOLS:
