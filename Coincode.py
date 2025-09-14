@@ -47,8 +47,8 @@ def get_headers(method='GET', path='', query_string='', payload=''):
 
 def get_candle_1d(symbol):
     try:
-        now = datetime.now(timezone.utc)
-        today_midnight = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+        now = datetime.now()
+        today_midnight = datetime(now.year, now.month, now.day)
 
         prev_day_midnight = today_midnight - timedelta(days=1)
         start_time = int(prev_day_midnight.timestamp())
@@ -161,4 +161,5 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Next refresh in {refresh_rate} seconds")
+
 
