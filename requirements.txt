@@ -1,5 +1,1 @@
-streamlit
-streamlit-autorefresh
-requests
-pandas
-hmac
+
