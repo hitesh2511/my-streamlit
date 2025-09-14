@@ -22,7 +22,6 @@ SYMBOLS = ['WLFIUSD','AIOUSD','ZORAUSD','TOWNSUSD','PROVEUSD','ENSUSD','SKLUSD',
            'JTOUSD','HBARUSD','ORDIUSD','MEMEUSD','FLOKIUSD','PEPEUSD','ARBUSD','TIAUSD','SEIUSD','SUIUSD','WLDUSD','INJUSD','ALGOUSD','NEARUSD','ADAUSD','ATOMUSD','BONKUSD','SHIBUSD','WIFUSD',
            'DOTUSD','UNIUSD','BNBUSD','LINKUSD','LTCUSD','BCHUSD','XRPUSD','AVAXUSD','SOLUSD','DOGEUSD','ETHUSD','BTCUSD' ]  # Valid Delta Exchange symbols
 
-
 TELEGRAM_TOKEN = '7994211539:AAGTxk3VBb4rcg4CqMrK3B47geKCSjebg5w'
 TELEGRAM_CHAT_ID = '-1002806176997'
 
@@ -52,26 +51,20 @@ def get_candle_1d(symbol):
         now = datetime.now(timezone.utc)
         today_midnight = datetime(now.year, now.month, now.day)
         prev_day_midnight = today_midnight - timedelta(days=1)
-
         start_time = int(prev_day_midnight.timestamp())
         end_time = int(today_midnight.timestamp())
-
         path = '/v2/history/candles'
         query_string = f'?symbol={symbol}&resolution=1d&start={start_time}&end={end_time}'
-
         url = f"{DELTA_API_URL}{path}{query_string}"
         headers = get_headers('GET', path, query_string)
-
         response = requests.get(url, headers=headers, timeout=10)
         data = response.json()
-
         if data.get('success') and data.get('result'):
             candle = data['result'][0]
             return float(candle['high']), float(candle['low'])
         else:
             print(f"Candle API error for {symbol}: {data}")
             return None, None
-
     except Exception as e:
         print(f"Error fetching candle data for {symbol}: {e}")
         return None, None
@@ -81,16 +74,13 @@ def get_latest_price(symbol):
         path = f'/v2/tickers/{symbol}'
         url = f"{DELTA_API_URL}{path}"
         headers = get_headers('GET', path)
-
         response = requests.get(url, headers=headers, timeout=10)
         data = response.json()
-
         if data.get('success') and data.get('result'):
             return float(data['result']['mark_price'])
         else:
             print(f"Ticker API error for {symbol}: {data}")
             return None
-
     except Exception as e:
         print(f"Error fetching price for {symbol}: {e}")
         return None
@@ -110,17 +100,16 @@ st.sidebar.header("Settings")
 
 refresh_rate = st.sidebar.slider("Auto-refresh (seconds)", 10, 600, 300)
 
+# Autorefresh call **only once**
 count = st_autorefresh(interval=refresh_rate * 1000, key="datarefresh")
 
 if 'last_status' not in st.session_state:
     st.session_state.last_status = {}
 
 table_data = []
-
 for symbol in SYMBOLS:
     day_high, day_low = get_candle_1d(symbol)
     current_price = get_latest_price(symbol)
-
     if day_high is None or day_low is None or current_price is None:
         status = "Error"
         day_high = day_low = current_price = "-"
@@ -131,14 +120,11 @@ for symbol in SYMBOLS:
             status = "Breakdown"
         else:
             status = "Normal"
-
         prev_status = st.session_state.last_status.get(symbol)
         if status in ["Breakout", "Breakdown"] and prev_status != status:
             alert_msg = f"🚨 {symbol} {status}!\n💰 Price: {current_price}\n📈 High: {day_high}\n📉 Low: {day_low}"
             send_telegram(alert_msg)
-
         st.session_state.last_status[symbol] = status
-
     table_data.append({
         'Symbol': symbol,
         'Price': current_price,
