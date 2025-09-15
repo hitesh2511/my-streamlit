@@ -179,14 +179,15 @@ for symbol in SYMBOLS:
 
         # Send alert once per breakout/breakdown on status change
         if status in ["Breakout", "Breakdown"] and prev_status != status:
-            alert_msg = (
-                f"🚨 {symbol} {status}!\n"
-                f"💰 Price: {current_price}\n"
-                f"📈 High: {day_high}\n"
-                f"📉 Low: {day_low}\n"
-                f"📊 5-min Volume: {current_5min_volume}\n"
-                f"📉 5-day Avg Volume: {avg_5d_volume:.2f}\n"
-                f"⚡ Volume > 5D Avg: {vol_signal}"
+                  alert_msg = (
+                    f"🚨 {symbol} {status}!\n"
+                    f"💰 Price: {current_price}\n"
+                    f"📈 High: {day_high}\n"
+                    f"📉 Low: {day_low}\n"
+                    f"📊 5-min Volume: {current_5min_volume}\n"
+                    + (f"📉 5-day Avg Volume: {avg_5d_volume:.2f}\n" if avg_5d_volume is not None else "📉 5-day Avg Volume: N/A\n")
+                    + f"⚡ Volume > 5D Avg: {vol_signal}"
+                )
             )
             send_telegram(alert_msg)
             st.session_state.last_alert_time[symbol] = current_time
@@ -224,3 +225,4 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Next refresh in {refresh_rate} seconds")
+
