@@ -118,33 +118,36 @@ def send_telegram(msg):
     except Exception as e:
         print(f"Telegram error: {e}")
 
-# ---- Streamlit App -----
-st.title("🚀 Delta Exchange Breakout/Breakdown Monitor")
-st.write("Monitors selected coins for previous day's high/low breakouts and breakdowns with Telegram alerts.")
-st.sidebar.header("Settings")
+# ---- Auto-refresh logic ----
 refresh_rate = st.sidebar.slider("Auto-refresh (seconds)", 10, 600, 300)
 
 if 'last_refresh_time' not in st.session_state:
     st.session_state.last_refresh_time = time.time()
     st.session_state.has_run_once = False
 
+current_loop_time = time.time()
+
+if st.session_state.has_run_once:
+    if current_loop_time - st.session_state.last_refresh_time > refresh_rate:
+        st.session_state.last_refresh_time = current_loop_time
+        st.experimental_rerun()
+else:
+    st.session_state.has_run_once = True
+
+# ---- Streamlit UI -----
+st.title("🚀 Delta Exchange Breakout/Breakdown Monitor")
+st.write("Monitors selected coins for previous day's high/low breakouts and breakdowns with Telegram alerts.")
+st.sidebar.header("Settings")
+
+# Initialize session state containers
 if 'last_status' not in st.session_state:
     st.session_state.last_status = {}
-
 if 'last_alert_time' not in st.session_state:
     st.session_state.last_alert_time = {}
-
 if 'breakout_time' not in st.session_state:
     st.session_state.breakout_time = {}
 
 current_time = datetime.now(timezone.utc)
-
-if st.session_state.has_run_once:
-    if time.time() - st.session_state.last_refresh_time > refresh_rate:
-        st.session_state.last_refresh_time = time.time()
-        st.experimental_rerun()
-else:
-    st.session_state.has_run_once = True
 
 table_data = []
 for symbol in SYMBOLS:
@@ -165,28 +168,30 @@ for symbol in SYMBOLS:
             status = "Normal"
 
         prev_status = st.session_state.last_status.get(symbol)
-        
-        # 5-min volume info
+
         five_min_candles = get_5min_candles(symbol, days=1)
         current_5min_volume = 0
         if five_min_candles and len(five_min_candles) > 0:
             current_5min_volume = five_min_candles[-1]['volume']
+
         avg_5d_volume = calc_avg_volume_5d(symbol)
+
         vol_above_avg = False
         if current_5min_volume is not None and avg_5d_volume is not None:
             vol_above_avg = current_5min_volume > avg_5d_volume
         vol_signal = "Yes" if vol_above_avg else "No"
 
-        # Send alert once per breakout/breakdown on status change
         if status in ["Breakout", "Breakdown"] and prev_status != status:
+            avg_vol_text = f"{avg_5d_volume:.2f}" if avg_5d_volume is not None else "N/A"
             alert_msg = (
                 f"🚨 {symbol} {status}!\n"
                 f"💰 Price: {current_price}\n"
                 f"📈 High: {day_high}\n"
                 f"📉 Low: {day_low}\n"
                 f"📊 5-min Volume: {current_5min_volume}\n"
-                f"📉 5-day Avg Volume: {avg_5d_volume:.2f}\n" if avg_5d_volume is not None else "📉 5-day Avg Volume: N/A\n"
-                f"⚡ Volume > 5D Avg: {vol_signal}"
+                f"📉 5-day Avg Volume: {avg_vol_text}\n"
+                f"⚡ Volume > 5D Avg: {vol_signal}\n"
+                f"⏰ Breakout Time: {current_time.strftime('%Y-%m-%d %H:%M:%S')}"
             )
             send_telegram(alert_msg)
             st.session_state.last_alert_time[symbol] = current_time
@@ -224,4 +229,3 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Next refresh in {refresh_rate} seconds")
-
