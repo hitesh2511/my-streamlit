@@ -13,8 +13,8 @@ API_SECRET = ''  # Leave empty for public data
 
 SYMBOLS = ['WLFIUSD','AIOUSD','ZORAUSD','ETHUSD','BTCUSD']
 
-TELEGRAM_TOKEN = ''
-TELEGRAM_CHAT_ID = ''
+TELEGRAM_TOKEN = '8182445220:AAGHM9V-CBoECadOAz3SFBRTQu-gqFq8Bvs'
+TELEGRAM_CHAT_ID = '-1002721557943'
 
 # ---- Helper functions -----
 
@@ -229,3 +229,4 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Next refresh in {refresh_rate} seconds")
+
