@@ -1,1 +1,11 @@
+services:
+  - type: web
+    name: my-streamlit-app
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "streamlit run your_app.py --server.port 10000"
+    branch: main
+    autoDeploy: true
 
