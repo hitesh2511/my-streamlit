@@ -86,7 +86,7 @@ def get_5min_candles(symbol, days=5):
         start_time = int((now - timedelta(days=days)).timestamp())
 
         path = '/v2/history/candles'
-        query_string = f'?symbol={symbol}&resolution=5&start={start_time}&end={end_time}'
+        query_string = f'?symbol={symbol}&resolution=5m&start={start_time}&end={end_time}'
         url = f"{DELTA_API_URL}{path}{query_string}"
 
         headers = get_headers('GET', path, query_string)
@@ -229,3 +229,4 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Next refresh in {refresh_rate} seconds")
+
