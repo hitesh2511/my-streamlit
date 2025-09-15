@@ -4,7 +4,7 @@ import pandas as pd
 import hmac
 import hashlib
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time as dtime
 
 # ---- Configuration (Edit these) -----
 DELTA_API_URL = 'https://api.india.delta.exchange'
@@ -39,16 +39,20 @@ def get_headers(method='GET', path='', query_string='', payload=''):
 
 def get_candle_1d(symbol):
     try:
-        now = datetime.now(timezone.utc)
-        today_midnight = datetime.combine(now.date(), datetime.min.time(), tzinfo=timezone.utc)
-        prev_day_midnight = today_midnight - timedelta(days=1)
-        start_time = int(prev_day_midnight.timestamp())
-        end_time = int(today_midnight.timestamp())
+        # IST is UTC+5:30
+        IST = timezone(timedelta(hours=5, minutes=30))
+        now_ist = datetime.now(IST)
+        today_midnight_ist = datetime.combine(now_ist.date(), dtime(0, 0), tzinfo=IST)
+        prev_day_midnight_ist = today_midnight_ist - timedelta(days=1)
         
-        print(f"DEBUG: {symbol} candle fetch timestamps: start={start_time} ({prev_day_midnight}), end={end_time} ({today_midnight})")  # Debug log
+        # Convert to UTC for API
+        start_time_utc = int(prev_day_midnight_ist.astimezone(timezone.utc).timestamp())
+        end_time_utc = int(today_midnight_ist.astimezone(timezone.utc).timestamp())
         
+        print(f"DEBUG: {symbol} IST candle - start: {start_time_utc}, end: {end_time_utc}")
+
         path = '/v2/history/candles'
-        query_string = f'?symbol={symbol}&resolution=1d&start={start_time}&end={end_time}'
+        query_string = f'?symbol={symbol}&resolution=1d&start={start_time_utc}&end={end_time_utc}'
         url = f"{DELTA_API_URL}{path}{query_string}"
         headers = get_headers('GET', path, query_string)
         response = requests.get(url, headers=headers, timeout=10)
@@ -62,6 +66,7 @@ def get_candle_1d(symbol):
     except Exception as e:
         print(f"Error fetching candle data for {symbol}: {e}")
         return None, None
+
 
 def get_latest_price(symbol):
     try:
@@ -155,6 +160,7 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Next refresh in {refresh_rate} seconds")
+
 
 
 
