@@ -21,8 +21,8 @@ SYMBOLS = ['WLFIUSD','AIOUSD','ZORAUSD','TOWNSUSD','PROVEUSD','ENSUSD','SKLUSD',
            'JTOUSD','HBARUSD','ORDIUSD','MEMEUSD','FLOKIUSD','PEPEUSD','ARBUSD','TIAUSD','SEIUSD','SUIUSD','WLDUSD','INJUSD','ALGOUSD','NEARUSD','ADAUSD','ATOMUSD','BONKUSD','SHIBUSD','WIFUSD',
            'DOTUSD','UNIUSD','BNBUSD','LINKUSD','LTCUSD','BCHUSD','XRPUSD','AVAXUSD','SOLUSD','DOGEUSD','ETHUSD','BTCUSD']
 
-TELEGRAM_TOKEN = 
-TELEGRAM_CHAT_ID = 
+TELEGRAM_TOKEN = ''
+TELEGRAM_CHAT_ID = ''
 
 # ---- Helper functions -----
 
@@ -161,6 +161,7 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Next refresh in {refresh_rate} seconds")
+
 
 
 
