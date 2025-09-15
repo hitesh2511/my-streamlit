@@ -13,8 +13,8 @@ API_SECRET = ''  # Leave empty for public data
 
 SYMBOLS = ['WLFIUSD','AIOUSD','ZORAUSD','ETHUSD','BTCUSD']
 
-TELEGRAM_TOKEN = '8182445220:AAGHM9V-CBoECadOAz3SFBRTQu-gqFq8Bvs'
-TELEGRAM_CHAT_ID = '-1002721557943'
+TELEGRAM_TOKEN = ''
+TELEGRAM_CHAT_ID = ''
 
 # ---- Helper functions -----
 
@@ -118,7 +118,7 @@ def send_telegram(msg):
     except Exception as e:
         print(f"Telegram error: {e}")
 
-# ---- Auto-refresh logic ----
+# ---- Safe auto-refresh logic ----
 refresh_rate = st.sidebar.slider("Auto-refresh (seconds)", 10, 600, 300)
 
 if 'last_refresh_time' not in st.session_state:
@@ -139,7 +139,7 @@ st.title("🚀 Delta Exchange Breakout/Breakdown Monitor")
 st.write("Monitors selected coins for previous day's high/low breakouts and breakdowns with Telegram alerts.")
 st.sidebar.header("Settings")
 
-# Initialize session state containers
+# Initialize session states
 if 'last_status' not in st.session_state:
     st.session_state.last_status = {}
 if 'last_alert_time' not in st.session_state:
@@ -229,4 +229,3 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Next refresh in {refresh_rate} seconds")
-
