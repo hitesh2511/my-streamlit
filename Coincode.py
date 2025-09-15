@@ -13,8 +13,8 @@ API_SECRET = ''  # Leave empty for public data
 
 SYMBOLS = ['WLFIUSD','AIOUSD','ZORAUSD','ETHUSD','BTCUSD']
 
-TELEGRAM_TOKEN = '8182445220:AAGHM9V-CBoECadOAz3SFBRTQu-gqFq8Bvs'
-TELEGRAM_CHAT_ID = '-1002721557943'
+TELEGRAM_TOKEN = "8182445220:AAGHM9V-CBoECadOAz3SFBRTQu-gqFq8Bvs"
+TELEGRAM_CHAT_ID = "-1002721557943"
 
 # ---- Helper functions -----
 
@@ -130,7 +130,7 @@ current_loop_time = time.time()
 if st.session_state.has_run_once:
     if current_loop_time - st.session_state.last_refresh_time > refresh_rate:
         st.session_state.last_refresh_time = current_loop_time
-        st.experimental_rerun()
+        st.rerun()  # ← FIXED: Changed from st.experimental_rerun()
 else:
     st.session_state.has_run_once = True
 
@@ -229,4 +229,3 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Next refresh in {refresh_rate} seconds")
-
