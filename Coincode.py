@@ -130,7 +130,7 @@ current_loop_time = time.time()
 if st.session_state.has_run_once:
     if current_loop_time - st.session_state.last_refresh_time > refresh_rate:
         st.session_state.last_refresh_time = current_loop_time
-        st.rerun()  # ← FIXED: Changed from st.experimental_rerun()
+        st.rerun()
 else:
     st.session_state.has_run_once = True
 
@@ -142,12 +142,16 @@ st.sidebar.header("Settings")
 # Initialize session states
 if 'last_status' not in st.session_state:
     st.session_state.last_status = {}
-if 'last_alert_time' not in st.session_state:
-    st.session_state.last_alert_time = {}
+if 'last_alert_date' not in st.session_state:
+    st.session_state.last_alert_date = {}  # Track alert date per symbol
 if 'breakout_time' not in st.session_state:
     st.session_state.breakout_time = {}
 
-current_time = datetime.now(timezone.utc)
+# Get current time in both UTC and IST
+current_time_utc = datetime.now(timezone.utc)
+IST = timezone(timedelta(hours=5, minutes=30))
+current_time_ist = current_time_utc.astimezone(IST)
+today_date = current_time_ist.date()
 
 table_data = []
 for symbol in SYMBOLS:
@@ -181,7 +185,12 @@ for symbol in SYMBOLS:
             vol_above_avg = current_5min_volume > avg_5d_volume
         vol_signal = "Yes" if vol_above_avg else "No"
 
-        if status in ["Breakout", "Breakdown"] and prev_status != status:
+        # Check if alert was already sent today for this symbol
+        last_alert_date = st.session_state.last_alert_date.get(symbol)
+        alert_sent_today = last_alert_date == today_date
+
+        # Send alert only once per day per symbol for breakout/breakdown
+        if status in ["Breakout", "Breakdown"] and not alert_sent_today:
             avg_vol_text = f"{avg_5d_volume:.2f}" if avg_5d_volume is not None else "N/A"
             alert_msg = (
                 f"🚨 {symbol} {status}!\n"
@@ -191,14 +200,19 @@ for symbol in SYMBOLS:
                 f"📊 5-min Volume: {current_5min_volume}\n"
                 f"📉 5-day Avg Volume: {avg_vol_text}\n"
                 f"⚡ Volume > 5D Avg: {vol_signal}\n"
-                f"⏰ Breakout Time: {current_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                f"⏰ Breakout Time: {current_time_ist.strftime('%Y-%m-%d %H:%M:%S IST')}"
             )
             send_telegram(alert_msg)
-            st.session_state.last_alert_time[symbol] = current_time
-            breakout_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
+            st.session_state.last_alert_date[symbol] = today_date  # Mark alert sent for today
+            breakout_time = current_time_ist.strftime("%Y-%m-%d %H:%M:%S IST")
             st.session_state.breakout_time[symbol] = breakout_time
         else:
-            breakout_time = st.session_state.breakout_time.get(symbol, "-")
+            # Keep existing breakout time if already set, or show "-" if normal status
+            if status == "Normal":
+                breakout_time = "-"
+                st.session_state.breakout_time[symbol] = breakout_time
+            else:
+                breakout_time = st.session_state.breakout_time.get(symbol, "-")
 
         st.session_state.last_status[symbol] = status
 
@@ -228,4 +242,4 @@ with col2:
 with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
-st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Next refresh in {refresh_rate} seconds")
+st.info(f"Last updated: {current_time_ist.strftime('%Y-%m-%d %H:%M:%S IST')} | Next refresh in {refresh_rate} seconds")
