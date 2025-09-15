@@ -5,28 +5,51 @@ import hmac
 import hashlib
 import time
 from datetime import datetime, timedelta, timezone, time as dtime
+import os
+import base64
+import json
+import firebase_admin
+from firebase_admin import credentials, firestore
 
 # ---- Configuration (Edit these) -----
 DELTA_API_URL = 'https://api.india.delta.exchange'
-API_KEY = ''  # Leave empty for public data
-API_SECRET = ''  # Leave empty for public data
+API_KEY = ''  # Your API key if any
+API_SECRET = ''  # Your API secret if any
+SYMBOLS = ['WLFIUSD','AIOUSD','ZORAUSD','TOWNSUSD','PROVEUSD','ENSUSD', 'SKLUSD']  # Sample shortened list for testing
+TELEGRAM_TOKEN = '7994211539:AAGTxk3VBb4rcg4CqMrK3B47geKCSjebg5w'
+TELEGRAM_CHAT_ID = '-1002806176997'
 
-SYMBOLS = ['WLFIUSD','AIOUSD','ZORAUSD','TOWNSUSD','PROVEUSD','ENSUSD','SKLUSD','AINUSD','SAHARAUSD','HUSD','MUSD','CROSSUSD','PUMPUSD','BIDUSD','MEUSD','SOPHUSD','MASKUSD'
-           ,'HYPEUSD','WCTUSD','SIGNUSD','MEMEFIUSD','DEEPUSD','INITUSD','1000XUSD','API3USD','MUBARAKUSD','BMTUSD','LAYERUSD','RAREUSD','REDUSD','AUCTIONUSD','KAITOUSD'
-           ,'PIUSD','GLMUSD','TSTUSD','BAKEUSD','CAKEUSD','IPUSD','BERAUSD','VVVUSD','VINEUSD','ARCUSD','AVAAIUSD','SOLVUSD','VANAUSD','COOKIEUSD','SUSD','GRIFFAINUSD',
-           'JUPUSD','SWARMSUSD','MELANIAUSD','TRUMPUSD','SPXUSD','HIVEUSD','SONICUSD','BIOUSD','MOVEUSD','PENGUUSD','AIXBTUSD','AI16ZUSD','USUALUSD','VIRTUALUSD','FARTCOINUSD',
-           '1000SATSUSD','1MBABYDOGEUSD','JASMYUSD','DOGSUSD','MOODENGUSD','SUNUSD','OMUSD','IOTAUSD','RSRUSD','GOATUSD','KSMUSD','XLMUSD','SANDUSD','MANAUSD','POPCATUSD','ACTUSD',
-           'PNUTUSD','SAGAUSD','NEIROUSD','POLUSD','EIGENUSD','MANTAUSD','GALAUSD','BLURUSD','OMNIUSD','TAOUSD','LISTAUSD','ZKUSD','IOUSD','ZROUSD','BBUSD','NOTUSD','ETHFIUSD','PEOPLEUSD',
-           'DYDXUSD','SUSHIUSD','MKRUSD','ARUSD','RUNEUSD','XAIUSD','APTUSD','STXUSD','ALTUSD','TRXUSD','OPUSD','FILUSD','LDOUSD','ETCUSD','TRBUSD','ENAUSD','PENDLEUSD','ONDOUSD','AAVEUSD',
-           'JTOUSD','HBARUSD','ORDIUSD','MEMEUSD','FLOKIUSD','PEPEUSD','ARBUSD','TIAUSD','SEIUSD','SUIUSD','WLDUSD','INJUSD','ALGOUSD','NEARUSD','ADAUSD','ATOMUSD','BONKUSD','SHIBUSD','WIFUSD',
-           'DOTUSD','UNIUSD','BNBUSD','LINKUSD','LTCUSD','BCHUSD','XRPUSD','AVAXUSD','SOLUSD','DOGEUSD','ETHUSD','BTCUSD' ]  # Valid Delta Exchange symbols
+# ---- Initialize Firebase ----
+if not firebase_admin._apps:
+    firebase_key_b64 = os.getenv('FIREBASE_SERVICE_ACCOUNT_B64')
+    if not firebase_key_b64:
+        st.error("Firebase credentials not found in environment variables.")
+        st.stop()
+    firebase_key_json = base64.b64decode(firebase_key_b64)
+    cred_dict = json.loads(firebase_key_json)
+    cred = credentials.Certificate(cred_dict)
+    firebase_admin.initialize_app(cred)
 
+db = firestore.client()
 
-TELEGRAM_TOKEN = "8182445220:AAGHM9V-CBoECadOAz3SFBRTQu-gqFq8Bvs"
-TELEGRAM_CHAT_ID = "-1002721557943"
+# ---- Firestore helper functions ----
+def get_today_date_str():
+    IST = timezone(timedelta(hours=5, minutes=30))
+    now_ist = datetime.now(IST)
+    return now_ist.strftime('%Y-%m-%d')
 
-# ---- Helper functions -----
+def fetch_alerted_symbols():
+    doc_ref = db.collection('breakouts').document(get_today_date_str())
+    doc = doc_ref.get()
+    if doc.exists:
+        return doc.to_dict()  # e.g., { 'WLFIUSD': True, 'AIOUSD': True }
+    return {}
 
+def mark_symbol_alerted(symbol):
+    doc_ref = db.collection('breakouts').document(get_today_date_str())
+    doc_ref.set({symbol: True}, merge=True)
+
+# ---- Helper functions for API calls ----
 def generate_signature(secret, message):
     message = bytes(message, 'utf-8')
     secret = bytes(secret, 'utf-8')
@@ -52,10 +75,8 @@ def get_candle_1d(symbol):
         now_ist = datetime.now(IST)
         today_midnight_ist = datetime.combine(now_ist.date(), dtime(0, 0), tzinfo=IST)
         prev_day_midnight_ist = today_midnight_ist - timedelta(days=1)
-
         start_time_utc = int(prev_day_midnight_ist.astimezone(timezone.utc).timestamp())
         end_time_utc = int(today_midnight_ist.astimezone(timezone.utc).timestamp())
-
         path = '/v2/history/candles'
         query_string = f'?symbol={symbol}&resolution=1d&start={start_time_utc}&end={end_time_utc}'
         url = f"{DELTA_API_URL}{path}{query_string}"
@@ -93,15 +114,12 @@ def get_5min_candles(symbol, days=5):
         now = datetime.now(timezone.utc)
         end_time = int(now.timestamp())
         start_time = int((now - timedelta(days=days)).timestamp())
-
         path = '/v2/history/candles'
         query_string = f'?symbol={symbol}&resolution=5m&start={start_time}&end={end_time}'
         url = f"{DELTA_API_URL}{path}{query_string}"
-
         headers = get_headers('GET', path, query_string)
         response = requests.get(url, headers=headers, timeout=10)
         data = response.json()
-
         if data.get('success') and data.get('result'):
             return data['result']
         else:
@@ -127,19 +145,16 @@ def send_telegram(msg):
     except Exception as e:
         print(f"Telegram error: {e}")
 
-# ---- Safe auto-refresh logic ----
+# ---- Auto-refresh logic ----
 refresh_rate = st.sidebar.slider("Auto-refresh (seconds)", 10, 600, 300)
-
 if 'last_refresh_time' not in st.session_state:
     st.session_state.last_refresh_time = time.time()
     st.session_state.has_run_once = False
-
 current_loop_time = time.time()
-
 if st.session_state.has_run_once:
     if current_loop_time - st.session_state.last_refresh_time > refresh_rate:
         st.session_state.last_refresh_time = current_loop_time
-        st.rerun()
+        st.experimental_rerun()
 else:
     st.session_state.has_run_once = True
 
@@ -148,21 +163,19 @@ st.title("🚀 Delta Exchange Breakout/Breakdown Monitor")
 st.write("Monitors selected coins for previous day's high/low breakouts and breakdowns with Telegram alerts.")
 st.sidebar.header("Settings")
 
-# Initialize session states
-if 'last_status' not in st.session_state:
-    st.session_state.last_status = {}
-if 'last_alert_date' not in st.session_state:
-    st.session_state.last_alert_date = {}  # Track alert date per symbol
+# Track breakout times per symbol in session state (for UI)
 if 'breakout_time' not in st.session_state:
     st.session_state.breakout_time = {}
 
-# Get current time in both UTC and IST
 current_time_utc = datetime.now(timezone.utc)
 IST = timezone(timedelta(hours=5, minutes=30))
 current_time_ist = current_time_utc.astimezone(IST)
-today_date = current_time_ist.date()
+
+# Load alerted symbols from Firestore
+alerted_symbols = fetch_alerted_symbols()
 
 table_data = []
+
 for symbol in SYMBOLS:
     day_high, day_low = get_candle_1d(symbol)
     current_price = get_latest_price(symbol)
@@ -180,23 +193,17 @@ for symbol in SYMBOLS:
         else:
             status = "Normal"
 
-        prev_status = st.session_state.last_status.get(symbol)
-
         five_min_candles = get_5min_candles(symbol, days=1)
         current_5min_volume = 0
         if five_min_candles and len(five_min_candles) > 0:
             current_5min_volume = five_min_candles[-1]['volume']
-
         avg_5d_volume = calc_avg_volume_5d(symbol)
-
         vol_above_avg = False
         if current_5min_volume is not None and avg_5d_volume is not None:
             vol_above_avg = current_5min_volume > avg_5d_volume
         vol_signal = "Yes" if vol_above_avg else "No"
 
-        # Check if alert was already sent today for this symbol
-        last_alert_date = st.session_state.last_alert_date.get(symbol)
-        alert_sent_today = last_alert_date == today_date
+        alert_sent_today = alerted_symbols.get(symbol, False)
 
         # Send alert only once per day per symbol for breakout/breakdown
         if status in ["Breakout", "Breakdown"] and not alert_sent_today:
@@ -212,18 +219,15 @@ for symbol in SYMBOLS:
                 f"⏰ Breakout Time: {current_time_ist.strftime('%Y-%m-%d %H:%M:%S IST')}"
             )
             send_telegram(alert_msg)
-            st.session_state.last_alert_date[symbol] = today_date  # Mark alert sent for today
+            mark_symbol_alerted(symbol)
             breakout_time = current_time_ist.strftime("%Y-%m-%d %H:%M:%S IST")
             st.session_state.breakout_time[symbol] = breakout_time
         else:
-            # Keep existing breakout time if already set, or show "-" if normal status
             if status == "Normal":
                 breakout_time = "-"
                 st.session_state.breakout_time[symbol] = breakout_time
             else:
                 breakout_time = st.session_state.breakout_time.get(symbol, "-")
-
-        st.session_state.last_status[symbol] = status
 
     table_data.append({
         'Symbol': symbol,
@@ -236,7 +240,6 @@ for symbol in SYMBOLS:
     })
 
 df = pd.DataFrame(table_data)
-
 pd.set_option('display.float_format', '{:.15f}'.format)
 st.dataframe(df, use_container_width=True)
 
@@ -252,4 +255,3 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {current_time_ist.strftime('%Y-%m-%d %H:%M:%S IST')} | Next refresh in {refresh_rate} seconds")
-
