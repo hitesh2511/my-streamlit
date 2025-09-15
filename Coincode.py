@@ -188,7 +188,7 @@ for symbol in SYMBOLS:
                     + (f"📉 5-day Avg Volume: {avg_5d_volume:.2f}\n" if avg_5d_volume is not None else "📉 5-day Avg Volume: N/A\n")
                     + f"⚡ Volume > 5D Avg: {vol_signal}"
                 )
-                )
+        )
             send_telegram(alert_msg)
             st.session_state.last_alert_time[symbol] = current_time
             breakout_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -225,5 +225,6 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Next refresh in {refresh_rate} seconds")
+
 
 
