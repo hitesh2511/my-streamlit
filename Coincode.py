@@ -5,9 +5,6 @@ import hmac
 import hashlib
 import time
 from datetime import datetime, timedelta, timezone, time as dtime
-import os
-import base64
-import json
 import firebase_admin
 from firebase_admin import credentials, firestore
 
@@ -15,19 +12,15 @@ from firebase_admin import credentials, firestore
 DELTA_API_URL = 'https://api.india.delta.exchange'
 API_KEY = ''  # Your API key if any
 API_SECRET = ''  # Your API secret if any
-SYMBOLS = ['WLFIUSD','AIOUSD','ZORAUSD','TOWNSUSD','PROVEUSD','ENSUSD', 'SKLUSD']  # Sample shortened list for testing
+SYMBOLS = ['WLFIUSD','AIOUSD','ZORAUSD']  # Example shortened list
 TELEGRAM_TOKEN = '7994211539:AAGTxk3VBb4rcg4CqMrK3B47geKCSjebg5w'
 TELEGRAM_CHAT_ID = '-1002806176997'
 
-# ---- Initialize Firebase ----
+# ---- Initialize Firebase from Secret File ----
+secret_file_path = '/etc/secrets/streamlit-7dad6-firebase-adminsdk-fbsvc-1d4c0ac424.json'
+
 if not firebase_admin._apps:
-    firebase_key_b64 = os.getenv('FIREBASE_SERVICE_ACCOUNT_B64')
-    if not firebase_key_b64:
-        st.error("Firebase credentials not found in environment variables.")
-        st.stop()
-    firebase_key_json = base64.b64decode(firebase_key_b64)
-    cred_dict = json.loads(firebase_key_json)
-    cred = credentials.Certificate(cred_dict)
+    cred = credentials.Certificate(secret_file_path)
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
@@ -42,14 +35,14 @@ def fetch_alerted_symbols():
     doc_ref = db.collection('breakouts').document(get_today_date_str())
     doc = doc_ref.get()
     if doc.exists:
-        return doc.to_dict()  # e.g., { 'WLFIUSD': True, 'AIOUSD': True }
+        return doc.to_dict()
     return {}
 
 def mark_symbol_alerted(symbol):
     doc_ref = db.collection('breakouts').document(get_today_date_str())
     doc_ref.set({symbol: True}, merge=True)
 
-# ---- Helper functions for API calls ----
+# ---- Helper functions (same as before) ----
 def generate_signature(secret, message):
     message = bytes(message, 'utf-8')
     secret = bytes(secret, 'utf-8')
@@ -73,7 +66,7 @@ def get_candle_1d(symbol):
     try:
         IST = timezone(timedelta(hours=5, minutes=30))
         now_ist = datetime.now(IST)
-        today_midnight_ist = datetime.combine(now_ist.date(), dtime(0, 0), tzinfo=IST)
+        today_midnight_ist = datetime.combine(now_ist.date(), dtime(0,0), tzinfo=IST)
         prev_day_midnight_ist = today_midnight_ist - timedelta(days=1)
         start_time_utc = int(prev_day_midnight_ist.astimezone(timezone.utc).timestamp())
         end_time_utc = int(today_midnight_ist.astimezone(timezone.utc).timestamp())
@@ -134,8 +127,7 @@ def calc_avg_volume_5d(symbol):
     if candles:
         volumes = [c['volume'] for c in candles if 'volume' in c]
         if volumes:
-            avg_vol = sum(volumes) / len(volumes)
-            return avg_vol
+            return sum(volumes) / len(volumes)
     return None
 
 def send_telegram(msg):
@@ -163,7 +155,6 @@ st.title("🚀 Delta Exchange Breakout/Breakdown Monitor")
 st.write("Monitors selected coins for previous day's high/low breakouts and breakdowns with Telegram alerts.")
 st.sidebar.header("Settings")
 
-# Track breakout times per symbol in session state (for UI)
 if 'breakout_time' not in st.session_state:
     st.session_state.breakout_time = {}
 
@@ -171,7 +162,6 @@ current_time_utc = datetime.now(timezone.utc)
 IST = timezone(timedelta(hours=5, minutes=30))
 current_time_ist = current_time_utc.astimezone(IST)
 
-# Load alerted symbols from Firestore
 alerted_symbols = fetch_alerted_symbols()
 
 table_data = []
@@ -205,7 +195,6 @@ for symbol in SYMBOLS:
 
         alert_sent_today = alerted_symbols.get(symbol, False)
 
-        # Send alert only once per day per symbol for breakout/breakdown
         if status in ["Breakout", "Breakdown"] and not alert_sent_today:
             avg_vol_text = f"{avg_5d_volume:.2f}" if avg_5d_volume is not None else "N/A"
             alert_msg = (
