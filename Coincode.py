@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timedelta, timezone, time as dtime
 import firebase_admin
 from firebase_admin import credentials, firestore
+from streamlit_autorefresh import st_autorefresh
 
 # ---- Configuration (Edit these) -----
 DELTA_API_URL = 'https://api.india.delta.exchange'
@@ -20,19 +21,15 @@ SYMBOLS = ['WLFIUSD','AIOUSD','ZORAUSD','TOWNSUSD','PROVEUSD','ENSUSD','SKLUSD',
            'PNUTUSD','SAGAUSD','NEIROUSD','POLUSD','EIGENUSD','MANTAUSD','GALAUSD','BLURUSD','OMNIUSD','TAOUSD','LISTAUSD','ZKUSD','IOUSD','ZROUSD','BBUSD','NOTUSD','ETHFIUSD','PEOPLEUSD',
            'DYDXUSD','SUSHIUSD','MKRUSD','ARUSD','RUNEUSD','XAIUSD','APTUSD','STXUSD','ALTUSD','TRXUSD','OPUSD','FILUSD','LDOUSD','ETCUSD','TRBUSD','ENAUSD','PENDLEUSD','ONDOUSD','AAVEUSD',
            'JTOUSD','HBARUSD','ORDIUSD','MEMEUSD','FLOKIUSD','PEPEUSD','ARBUSD','TIAUSD','SEIUSD','SUIUSD','WLDUSD','INJUSD','ALGOUSD','NEARUSD','ADAUSD','ATOMUSD','BONKUSD','SHIBUSD','WIFUSD',
-           'DOTUSD','UNIUSD','BNBUSD','LINKUSD','LTCUSD','BCHUSD','XRPUSD','AVAXUSD','SOLUSD','DOGEUSD','ETHUSD','BTCUSD' ]  # Valid Delta Exchange symbols
-
- # Example shortened list
+           'DOTUSD','UNIUSD','BNBUSD','LINKUSD','LTCUSD','BCHUSD','XRPUSD','AVAXUSD','SOLUSD','DOGEUSD','ETHUSD','BTCUSD']  # Valid Delta Exchange symbols
 TELEGRAM_TOKEN = '7994211539:AAGTxk3VBb4rcg4CqMrK3B47geKCSjebg5w'
 TELEGRAM_CHAT_ID = '-1002806176997'
 
 # ---- Initialize Firebase from Secret File ----
 secret_file_path = '/etc/secrets/streamlit-7dad6-firebase-adminsdk-fbsvc-1d4c0ac424.json'
-
 if not firebase_admin._apps:
     cred = credentials.Certificate(secret_file_path)
     firebase_admin.initialize_app(cred)
-
 db = firestore.client()
 
 # ---- Firestore helper functions ----
@@ -52,7 +49,7 @@ def mark_symbol_alerted(symbol):
     doc_ref = db.collection('breakouts').document(get_today_date_str())
     doc_ref.set({symbol: True}, merge=True)
 
-# ---- Helper functions (same as before) ----
+# ---- Helper functions ----
 def generate_signature(secret, message):
     message = bytes(message, 'utf-8')
     secret = bytes(secret, 'utf-8')
@@ -147,18 +144,9 @@ def send_telegram(msg):
     except Exception as e:
         print(f"Telegram error: {e}")
 
-# ---- Auto-refresh logic ----
+# ---- Auto-refresh logic using streamlit-autorefresh component ----
 refresh_rate = st.sidebar.slider("Auto-refresh (seconds)", 10, 600, 300)
-if 'last_refresh_time' not in st.session_state:
-    st.session_state.last_refresh_time = time.time()
-    st.session_state.has_run_once = False
-current_loop_time = time.time()
-if st.session_state.has_run_once:
-    if current_loop_time - st.session_state.last_refresh_time > refresh_rate:
-        st.session_state.last_refresh_time = current_loop_time
-        st.experimental_rerun()
-else:
-    st.session_state.has_run_once = True
+count = st_autorefresh(interval=refresh_rate * 1000, key="datarefresh")
 
 # ---- Streamlit UI -----
 st.title("🚀 Delta Exchange Breakout/Breakdown Monitor")
@@ -171,15 +159,12 @@ if 'breakout_time' not in st.session_state:
 current_time_utc = datetime.now(timezone.utc)
 IST = timezone(timedelta(hours=5, minutes=30))
 current_time_ist = current_time_utc.astimezone(IST)
-
 alerted_symbols = fetch_alerted_symbols()
 
 table_data = []
-
 for symbol in SYMBOLS:
     day_high, day_low = get_candle_1d(symbol)
     current_price = get_latest_price(symbol)
-
     if day_high is None or day_low is None or current_price is None:
         status = "Error"
         day_high = day_low = current_price = "-"
@@ -204,7 +189,6 @@ for symbol in SYMBOLS:
         vol_signal = "Yes" if vol_above_avg else "No"
 
         alert_sent_today = alerted_symbols.get(symbol, False)
-
         if status in ["Breakout", "Breakdown"] and not alert_sent_today:
             avg_vol_text = f"{avg_5d_volume:.2f}" if avg_5d_volume is not None else "N/A"
             alert_msg = (
@@ -254,4 +238,3 @@ with col3:
     st.metric("Total Monitored", len(SYMBOLS))
 
 st.info(f"Last updated: {current_time_ist.strftime('%Y-%m-%d %H:%M:%S IST')} | Next refresh in {refresh_rate} seconds")
-
