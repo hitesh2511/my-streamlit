@@ -3,3 +3,4 @@ requests
 pandas
 firebase-admin
 python-dateutil
+streamlit-autorefresh
