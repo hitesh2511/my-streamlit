@@ -20,14 +20,15 @@ import threading
 import requests
 import websocket
 from datetime import datetime
+import streamlit as st
 
 # --- CONFIG ------------------------------------------------------------------
 
 WEBSOCKET_URL    = "wss://socket.india.delta.exchange"
 DELTA_API_URL    = "https://api.india.delta.exchange"
 
-TELEGRAM_TOKEN = "8182445220:AAGHM9V-CBoECadOAz3SFBRTQu-gqFq8Bvs"
-TELEGRAM_CHAT_ID = "-1002721557943"
+TELEGRAM_TOKEN = st.secrets["BOT_ID"]
+TELEGRAM_CHAT_ID = st.secrets["BOT"]
 
 CANDLE_PCT_THRESHOLD = 0.80   # minimum absolute % move on 5-min candle
 ALERT_COOLDOWN_SEC   = 300    # seconds before re-alerting same symbol
