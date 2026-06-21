@@ -1,17 +1,17 @@
 """
-Delta Exchange - Real-Time WebSocket Monitor
-=============================================
+Delta Exchange - Real-Time WebSocket Monitor (Discord Bot)
+==========================================================
 Alert logic:
-  1. 5-min candle absolute % change >= 0.80%
+  1. 5-min candle absolute % change >= 0.60%
   2. Candle's open OR close (or both) fall in a price band (last 2 digits)
-     Bands: 50-60 | 90-100 | 00-10
+     Bands: 20-30 | 70-80
   Alert types:
     - ENTRY: open was outside band, close entered band
     - EXIT:  open was inside band, close exited band
     - INSIDE: both open & close in band (strong move within band)
 
-Install: pip install websocket-client requests
-Run:     python delta_ws_monitor.py
+Install: pip install websocket-client requests discord.py
+Run:     python delta_discord_monitor.py
 """
 
 import json
@@ -20,25 +20,27 @@ import threading
 import requests
 import websocket
 from datetime import datetime
-import streamlit as st
+import discord
+import asyncio
 
 # --- CONFIG ------------------------------------------------------------------
 
-WEBSOCKET_URL    = "wss://socket.india.delta.exchange"
-DELTA_API_URL    = "https://api.india.delta.exchange"
+WEBSOCKET_URL = "wss://socket.india.delta.exchange"
+DELTA_API_URL = "https://api.india.delta.exchange"
 
-TELEGRAM_TOKEN = st.secrets["BOT_ID"]
-TELEGRAM_CHAT_ID = st.secrets["BOT"]
+# --- DISCORD CONFIG -----------------------------------------------------------
+# Replace these with your actual values:
+DISCORD_BOT_TOKEN  = st.secret["BOT"]   # From Discord Developer Portal
+DISCORD_CHANNEL_ID = st.secret["BOTID"]          # Right-click channel → Copy ID
 
-CANDLE_PCT_THRESHOLD = 0.6   # minimum absolute % move on 5-min candle
+CANDLE_PCT_THRESHOLD = 0.6    # minimum absolute % move on 5-min candle
 ALERT_COOLDOWN_SEC   = 300    # seconds before re-alerting same symbol
 
 # Band definitions: (low_inclusive, high_inclusive, label)
 # Based on last 2 digits of integer part of price
 BANDS = [
-    (20, 30,  "20–30"),
-    (70, 80, "70–80")
-    
+    (20, 30, "00–99"),
+    (70, 80, "70–80"),
 ]
 
 SYMBOLS = [
@@ -68,6 +70,11 @@ alerted = {}   # symbol -> last alert timestamp
 
 lock = threading.Lock()
 
+# Discord client (global so WebSocket thread can use it)
+intents = discord.Intents.default()
+discord_client = discord.Client(intents=intents)
+discord_loop   = None   # will be set after bot starts
+
 # --- HELPERS -----------------------------------------------------------------
 
 def last_two_digits(price: float):
@@ -89,17 +96,28 @@ def in_band(last2):
             return label
     return None
 
-def send_telegram(msg: str):
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": msg}, timeout=10)
-    except Exception as e:
-        print(f"  [Telegram error] {e}")
+def send_discord(msg: str):
+    """Send a message to Discord channel from a non-async thread."""
+    if discord_loop is None or not discord_client.is_ready():
+        print(f"  [Discord not ready] {msg}")
+        return
+
+    async def _send():
+        try:
+            channel = discord_client.get_channel(DISCORD_CHANNEL_ID)
+            if channel is None:
+                channel = await discord_client.fetch_channel(DISCORD_CHANNEL_ID)
+            # Wrap in a code block for nice formatting
+            await channel.send(f"```\n{msg}\n```")
+        except Exception as e:
+            print(f"  [Discord send error] {e}")
+
+    asyncio.run_coroutine_threadsafe(_send(), discord_loop)
 
 def check_and_alert(symbol: str):
     """
     Alert when:
-      - 5min candle % >= threshold (0.80%)  -- checked FIRST
+      - 5min candle % >= threshold (0.60%)  -- checked FIRST
       - AND candle's open OR close falls in a price band
         * ENTRY:  open outside band, close inside band
         * EXIT:   open inside band, close outside band
@@ -155,18 +173,18 @@ def check_and_alert(symbol: str):
             band_info  = (f"Open last2: {open_last2:02d} -> "
                           f"Close last2: {close_last2:02d} (band {close_band})")
 
-        direction = "UP" if close_p >= open_p else "DOWN"
+        direction = "UP 🟢" if close_p >= open_p else "DOWN 🔴"
         msg = (
-            f"[ALERT] {alert_type}: {symbol}\n"
-            f"Price: {price}\n"
-            f"{band_info}\n"
-            f"5m Candle: {open_p} -> {close_p}  ({pct:+.2f}%)  {direction}\n"
-            f"Time: {datetime.now().strftime('%H:%M:%S')}"
+            f"🚨 [ALERT] {alert_type}: {symbol}\n"
+            f"💰 Price : {price}\n"
+            f"📊 {band_info}\n"
+            f"🕯  5m Candle: {open_p} → {close_p}  ({pct:+.2f}%)  {direction}\n"
+            f"🕒 Time  : {datetime.now().strftime('%H:%M:%S')}"
         )
         print(f"\n{'='*50}")
         print(msg)
         print('='*50)
-        send_telegram(msg)
+        send_discord(msg)
 
 # --- WEBSOCKET HANDLERS ------------------------------------------------------
 
@@ -221,7 +239,7 @@ def on_close(ws, code, msg):
     time.sleep(5)
     start_ws()
 
-# --- START -------------------------------------------------------------------
+# --- WEBSOCKET THREAD --------------------------------------------------------
 
 def start_ws():
     ws = websocket.WebSocketApp(
@@ -233,18 +251,55 @@ def start_ws():
     )
     ws.run_forever(ping_interval=30, ping_timeout=10)
 
+# --- DISCORD BOT EVENTS ------------------------------------------------------
+
+@discord_client.event
+async def on_ready():
+    global discord_loop
+    discord_loop = asyncio.get_event_loop()
+
+    print(f"\n✅ Discord Bot logged in as: {discord_client.user}")
+    print(f"   Sending alerts to channel ID: {DISCORD_CHANNEL_ID}")
+
+    # Send startup message to Discord
+    try:
+        channel = discord_client.get_channel(DISCORD_CHANNEL_ID)
+        if channel is None:
+            channel = await discord_client.fetch_channel(DISCORD_CHANNEL_ID)
+        await channel.send(
+            "```\n"
+            "🚀 Delta Exchange Band Alert Monitor Started!\n"
+            f"   Bands         : 20-30 | 70-80\n"
+            f"   Alert on      : ENTRY, EXIT, STRONG MOVE in band\n"
+            f"   Candle thresh : abs % >= {CANDLE_PCT_THRESHOLD}% (5-min)\n"
+            f"   Symbols       : {len(SYMBOLS)}\n"
+            f"   Cooldown      : {ALERT_COOLDOWN_SEC}s per symbol\n"
+            "```"
+        )
+    except Exception as e:
+        print(f"[Startup message error] {e}")
+
+    # Start WebSocket in a background thread once Discord is ready
+    ws_thread = threading.Thread(target=start_ws, daemon=True)
+    ws_thread.start()
+    print("   WebSocket monitor thread started.\n")
+
+# --- MAIN --------------------------------------------------------------------
+
 if __name__ == "__main__":
     print("=" * 50)
     print("  Delta Exchange Real-Time Band Alert Monitor")
+    print("  >> Discord Edition <<")
     print("=" * 50)
-    print(f"  Bands         : 50-60 | 90-100 | 00-10")
+    print(f"  Bands         : 20-30 | 70-80")
     print(f"  Alert on      : ENTRY, EXIT, STRONG MOVE in band")
     print(f"  Candle thresh : abs % >= {CANDLE_PCT_THRESHOLD}% (5-min)")
     print(f"  Symbols       : {len(SYMBOLS)}")
     print(f"  Cooldown      : {ALERT_COOLDOWN_SEC}s per symbol")
     print("=" * 50)
-    print("Press Ctrl+C to stop.\n")
+    print("Starting Discord bot... Press Ctrl+C to stop.\n")
+
     try:
-        start_ws()
+        discord_client.run(DISCORD_BOT_TOKEN)
     except KeyboardInterrupt:
         print("\nStopped.")
