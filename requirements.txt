@@ -5,3 +5,4 @@ firebase-admin
 python-dateutil
 streamlit-autorefresh
 websocket-client
+discord
