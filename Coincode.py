@@ -34,13 +34,13 @@ DELTA_API_URL = "https://api.india.delta.exchange"
 DISCORD_BOT_TOKEN  = st.secrets["BOT"]   # From Discord Developer Portal
 DISCORD_CHANNEL_ID = st.secrets["BOTID"]          # Right-click channel → Copy ID
 
-CANDLE_PCT_THRESHOLD = 0.1    # minimum absolute % move on 5-min candle
+CANDLE_PCT_THRESHOLD = 0.5    # minimum absolute % move on 5-min candle
 ALERT_COOLDOWN_SEC   = 300    # seconds before re-alerting same symbol
 
 # Band definitions: (low_inclusive, high_inclusive, label)
 # Based on last 2 digits of integer part of price
 BANDS = [
-    (20, 30, "00–99"),
+    (20, 30, "20–30"),
     (70, 80, "70–80"),
 ]
 
